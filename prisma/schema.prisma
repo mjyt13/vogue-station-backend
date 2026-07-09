@@ -1,0 +1,71 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum GarmentKind {
+  TSHIRT
+  SHIRT
+  SKIRT
+  PANTS
+}
+
+// Shared by every moderated asset type (garment models now, patterns later).
+enum ModerationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model User {
+  id            String         @id @default(uuid())
+  email         String         @unique
+  passwordHash  String         @map("password_hash")
+  role          Role           @default(USER)
+  bio           String?
+  createdAt     DateTime       @default(now()) @map("created_at")
+  refreshTokens RefreshToken[]
+  garmentModels GarmentModel[]
+
+  @@map("users")
+}
+
+model GarmentModel {
+  id        String           @id @default(uuid())
+  name      String
+  kind      GarmentKind
+  objectKey String           @map("object_key")
+  // null owner = official catalog item
+  owner     User?            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  ownerId   String?          @map("owner_id")
+  isPublic  Boolean          @default(false) @map("is_public")
+  status    ModerationStatus @default(PENDING)
+  version   Int              @default(1)
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  @@index([ownerId])
+  @@index([isPublic, status])
+  @@map("garment_models")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  tokenHash String   @unique @map("token_hash")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String   @map("user_id")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
