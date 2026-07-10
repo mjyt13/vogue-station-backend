@@ -8,6 +8,10 @@ export interface StorageProvider {
   /** Short-lived URL the browser can PUT an upload to (direct-to-storage). */
   putSignedUrl(key: string, ttlSeconds?: number): Promise<string>;
   delete(key: string): Promise<void>;
+  /** Server-side read for validation/processing. null if missing. Small objects only. */
+  getObject(key: string, maxBytes?: number): Promise<Buffer | null>;
+  /** Server-side write (e.g. generated thumbnails). */
+  putObject(key: string, data: Buffer): Promise<void>;
 }
 
 export const STORAGE_PROVIDER = Symbol('STORAGE_PROVIDER');

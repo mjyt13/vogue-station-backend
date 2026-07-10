@@ -1,14 +1,14 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { Role } from '../generated/prisma/enums';
 import { STORAGE_PROVIDER } from '../storage/storage-provider.interface';
 import type { StorageProvider } from '../storage/storage-provider.interface';
+import { modelPolicy } from './models.policy';
 import { ModelsRepository } from './models.repository';
 import {
   ModelDetailResponse,
   ModelResponse,
   PaginatedModelsResponse,
 } from './dto/model.response';
-import type { GarmentModel } from '../generated/prisma/client';
+import type { ModerationStatus } from '../generated/prisma/enums';
 import type { AccessTokenPayload } from '../auth/auth.types';
 
 @Injectable()
@@ -22,9 +22,10 @@ export class ModelsService {
     user: AccessTokenPayload,
     page: number,
     limit: number,
+    mine = false,
   ): Promise<PaginatedModelsResponse> {
-    const { items, total } = await this.modelsRepository.findVisible(
-      user.sub,
+    const { items, total } = await this.modelsRepository.findPage(
+      mine ? { ownerId: user.sub } : modelPolicy.whereVisibleTo(user),
       page,
       limit,
     );
@@ -42,7 +43,7 @@ export class ModelsService {
   ): Promise<ModelDetailResponse> {
     const model = await this.modelsRepository.findById(id);
     // 404 (not 403) for invisible models: don't reveal that the id exists.
-    if (!model || !this.canSee(user, model)) {
+    if (!model || !modelPolicy.canSee(user, model)) {
       throw new NotFoundException('Model not found');
     }
     // Sign only after the authorization check.
@@ -50,12 +51,21 @@ export class ModelsService {
     return ModelDetailResponse.withUrl(model, glbUrl);
   }
 
-  private canSee(user: AccessTokenPayload, model: GarmentModel): boolean {
-    return (
-      model.ownerId === null ||
-      model.ownerId === user.sub ||
-      (model.isPublic && model.status === 'APPROVED') ||
-      user.role === Role.ADMIN
+  async listForAdmin(
+    status: ModerationStatus | undefined,
+    page: number,
+    limit: number,
+  ): Promise<PaginatedModelsResponse> {
+    const { items, total } = await this.modelsRepository.findPage(
+      status ? { status } : {},
+      page,
+      limit,
     );
+    return {
+      items: items.map((item) => ModelResponse.from(item)),
+      total,
+      page,
+      limit,
+    };
   }
 }

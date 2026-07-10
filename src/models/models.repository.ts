@@ -6,23 +6,12 @@ import type { GarmentModel, Prisma } from '../generated/prisma/client';
 export class ModelsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** Catalog + approved public models + the caller's own. */
-  private visibleTo(userId: string): Prisma.GarmentModelWhereInput {
-    return {
-      OR: [
-        { isPublic: true, status: 'APPROVED' },
-        { ownerId: null },
-        { ownerId: userId },
-      ],
-    };
-  }
-
-  async findVisible(
-    userId: string,
+  /** Filter is decided by the caller (service layer owns authorization). */
+  async findPage(
+    where: Prisma.GarmentModelWhereInput,
     page: number,
     limit: number,
   ): Promise<{ items: GarmentModel[]; total: number }> {
-    const where = this.visibleTo(userId);
     const [items, total] = await this.prisma.$transaction([
       this.prisma.garmentModel.findMany({
         where,
@@ -37,5 +26,13 @@ export class ModelsRepository {
 
   findById(id: string): Promise<GarmentModel | null> {
     return this.prisma.garmentModel.findUnique({ where: { id } });
+  }
+
+  /** Object keys of a user's uploaded models — for storage cleanup on user deletion. */
+  findKeysByOwner(ownerId: string): Promise<{ objectKey: string }[]> {
+    return this.prisma.garmentModel.findMany({
+      where: { ownerId },
+      select: { objectKey: true },
+    });
   }
 }

@@ -36,8 +36,50 @@ model User {
   createdAt     DateTime       @default(now()) @map("created_at")
   refreshTokens RefreshToken[]
   garmentModels GarmentModel[]
+  colors        Color[]
+  patterns      Pattern[]
+  looks         Look[]
 
   @@map("users")
+}
+
+model Color {
+  id        String   @id @default(uuid())
+  name      String
+  hex       String
+  // null owner = global preset visible to everyone
+  owner     User?    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  ownerId   String?  @map("owner_id")
+  isPublic  Boolean  @default(false) @map("is_public")
+  createdAt DateTime @default(now()) @map("created_at")
+  looks     Look[]
+
+  @@index([ownerId])
+  @@index([isPublic])
+  @@map("colors")
+}
+
+model Pattern {
+  id           String           @id @default(uuid())
+  name         String
+  objectKey    String           @map("object_key")
+  thumbnailKey String?          @map("thumbnail_key")
+  mime         String
+  width        Int?
+  height       Int?
+  // false until the client confirms the upload and the bytes are validated
+  confirmed    Boolean          @default(false)
+  owner        User?            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  ownerId      String?          @map("owner_id")
+  isPublic     Boolean          @default(false) @map("is_public")
+  status       ModerationStatus @default(PENDING)
+  createdAt    DateTime         @default(now()) @map("created_at")
+  looks        Look[]
+
+  @@index([ownerId])
+  @@index([isPublic, status])
+  @@index([status])
+  @@map("patterns")
 }
 
 model GarmentModel {
@@ -52,10 +94,34 @@ model GarmentModel {
   status    ModerationStatus @default(PENDING)
   version   Int              @default(1)
   createdAt DateTime         @default(now()) @map("created_at")
+  looks     Look[]
 
   @@index([ownerId])
   @@index([isPublic, status])
   @@map("garment_models")
+}
+
+model Look {
+  id           String       @id @default(uuid())
+  name         String
+  owner        User         @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  ownerId      String       @map("owner_id")
+  // Catalog models must not disappear from under saved looks.
+  garmentModel GarmentModel @relation(fields: [garmentModelId], references: [id], onDelete: Restrict)
+  garmentModelId String     @map("garment_model_id")
+  // Reference + snapshot: colorHex keeps rendering if the color is deleted.
+  color        Color?       @relation(fields: [colorId], references: [id], onDelete: SetNull)
+  colorId      String?      @map("color_id")
+  colorHex     String       @map("color_hex")
+  pattern      Pattern?     @relation(fields: [patternId], references: [id], onDelete: SetNull)
+  patternId    String?      @map("pattern_id")
+  patternScale Float        @default(1) @map("pattern_scale")
+  thumbnailKey String?      @map("thumbnail_key")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+
+  @@index([ownerId])
+  @@map("looks")
 }
 
 model RefreshToken {

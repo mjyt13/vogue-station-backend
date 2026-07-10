@@ -1,8 +1,8 @@
 import { Controller, Get, Param, ParseUUIDPipe, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { PaginationQuery } from '../common/dto/pagination.query';
 import { ModelsService } from './models.service';
-import { ListModelsQuery } from './dto/list-models.query';
 import {
   ModelDetailResponse,
   PaginatedModelsResponse,
@@ -19,9 +19,9 @@ export class ModelsController {
   @ApiOkResponse({ type: PaginatedModelsResponse })
   list(
     @CurrentUser() user: AccessTokenPayload,
-    @Query() query: ListModelsQuery,
+    @Query() query: PaginationQuery,
   ): Promise<PaginatedModelsResponse> {
-    return this.modelsService.list(user, query.page, query.limit);
+    return this.modelsService.list(user, query.page, query.limit, query.mine);
   }
 
   @Get(':id')

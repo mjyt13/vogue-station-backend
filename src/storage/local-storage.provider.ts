@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { rm } from 'node:fs/promises';
+import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { dirname } from 'node:path';
 import { isAbsolute, join, normalize, resolve, sep } from 'node:path';
 import {
   DEFAULT_SIGNED_URL_TTL,
@@ -34,6 +35,22 @@ export class LocalStorageProvider implements StorageProvider {
 
   async delete(key: string): Promise<void> {
     await rm(this.resolveKey(key), { force: true });
+  }
+
+  async getObject(key: string, maxBytes?: number): Promise<Buffer | null> {
+    const path = this.resolveKey(key);
+    const fileStat = await stat(path).catch(() => null);
+    if (!fileStat?.isFile()) return null;
+    if (maxBytes !== undefined && fileStat.size > maxBytes) {
+      throw new Error(`Object ${key} exceeds ${maxBytes} bytes`);
+    }
+    return readFile(path);
+  }
+
+  async putObject(key: string, data: Buffer): Promise<void> {
+    const path = this.resolveKey(key);
+    await mkdir(dirname(path), { recursive: true });
+    await writeFile(path, data);
   }
 
   /** Maps a key to a path under the storage root; rejects traversal. */

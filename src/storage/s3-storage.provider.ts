@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import {
   DeleteObjectCommand,
   GetObjectCommand,
+  HeadObjectCommand,
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
@@ -23,6 +24,8 @@ export class S3StorageProvider implements StorageProvider {
     this.client = new S3Client({
       region: config.get<string>('S3_REGION') ?? 'auto',
       endpoint: config.get<string>('S3_ENDPOINT'),
+      // MinIO needs path-style (bucket in the path, not the subdomain)
+      forcePathStyle: config.get<string>('S3_FORCE_PATH_STYLE') === 'true',
       credentials: {
         accessKeyId: config.getOrThrow<string>('S3_ACCESS_KEY_ID'),
         secretAccessKey: config.getOrThrow<string>('S3_SECRET_ACCESS_KEY'),
@@ -49,6 +52,38 @@ export class S3StorageProvider implements StorageProvider {
   async delete(key: string): Promise<void> {
     await this.client.send(
       new DeleteObjectCommand({ Bucket: this.bucket, Key: key }),
+    );
+  }
+
+  async getObject(key: string, maxBytes?: number): Promise<Buffer | null> {
+    try {
+      if (maxBytes !== undefined) {
+        const head = await this.client.send(
+          new HeadObjectCommand({ Bucket: this.bucket, Key: key }),
+        );
+        if ((head.ContentLength ?? 0) > maxBytes) {
+          throw new Error(`Object ${key} exceeds ${maxBytes} bytes`);
+        }
+      }
+      const result = await this.client.send(
+        new GetObjectCommand({ Bucket: this.bucket, Key: key }),
+      );
+      const bytes = await result.Body?.transformToByteArray();
+      return bytes ? Buffer.from(bytes) : null;
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        ['NoSuchKey', 'NotFound'].includes(error.name)
+      ) {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  async putObject(key: string, data: Buffer): Promise<void> {
+    await this.client.send(
+      new PutObjectCommand({ Bucket: this.bucket, Key: key, Body: data }),
     );
   }
 }

@@ -22,7 +22,9 @@
     "db:up:deck": "flatpak-spawn --host podman start vogue-db",
     "db:migrate": "prisma migrate deploy",
     "db:generate": "prisma generate",
-    "db:seed": "nest build && node dist/database/seed.js"
+    "db:seed": "nest build && node dist/database/seed.js",
+    "storage:bootstrap": "nest build && node dist/storage/bootstrap-s3.js",
+    "minio:up:deck": "flatpak-spawn --host podman start vogue-minio"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1083.0",
@@ -41,7 +43,8 @@
     "class-validator": "^0.15.1",
     "cookie-parser": "^1.4.7",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.1"
+    "rxjs": "^7.8.1",
+    "sharp": "^0.35.3"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",

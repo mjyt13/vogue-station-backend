@@ -15,8 +15,10 @@ describe('AppController', () => {
   });
 
   describe('root', () => {
-    it('should return "Hello World!"', () => {
-      expect(appController.getHello()).toBe('Hello World!');
+    it('returns the greeting from AppService', () => {
+      expect(appController.getHello()).toBe(
+        'We are ready to give you info about models!',
+      );
     });
   });
 });

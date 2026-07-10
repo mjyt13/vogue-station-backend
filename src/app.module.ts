@@ -5,6 +5,9 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
+import { ColorsModule } from './colors/colors.module';
+import { LooksModule } from './looks/looks.module';
+import { PatternsModule } from './patterns/patterns.module';
 import { AccessTokenGuard } from './auth/guards/access-token.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
 import { PrismaModule } from './database/prisma.module';
@@ -21,6 +24,9 @@ import { UsersModule } from './users/users.module';
     UsersModule,
     AuthModule,
     ModelsModule,
+    ColorsModule,
+    PatternsModule,
+    LooksModule,
   ],
   controllers: [AppController],
   providers: [

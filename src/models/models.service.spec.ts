@@ -37,7 +37,7 @@ const admin: AccessTokenPayload = {
 
 describe('ModelsService', () => {
   let service: ModelsService;
-  const repoMock = { findVisible: jest.fn(), findById: jest.fn() };
+  const repoMock = { findPage: jest.fn(), findById: jest.fn() };
   const storageMock = {
     getSignedUrl: jest.fn().mockResolvedValue('https://signed.example/x'),
     putSignedUrl: jest.fn(),

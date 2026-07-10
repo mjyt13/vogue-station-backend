@@ -26,4 +26,9 @@ export class RefreshTokenRepository {
   async deleteById(id: string): Promise<void> {
     await this.prisma.refreshToken.delete({ where: { id } });
   }
+
+  /** Revoke every session, e.g. after a password change. */
+  async deleteAllForUser(userId: string): Promise<void> {
+    await this.prisma.refreshToken.deleteMany({ where: { userId } });
+  }
 }
