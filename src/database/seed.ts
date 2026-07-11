@@ -4,8 +4,10 @@
  */
 import 'dotenv/config';
 import * as argon2 from 'argon2';
+import sharp from 'sharp';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../generated/prisma/client';
+import { PRESET_PATTERNS } from './preset-patterns';
 
 const CATALOG_TSHIRT_ID = '00000000-0000-4000-8000-000000000001';
 
@@ -64,6 +66,30 @@ async function main() {
     });
   }
   console.log(`Seeded ${PRESET_COLORS.length} preset colors`);
+
+  // Preset patterns: rows only — `npm run storage:bootstrap` uploads the bytes.
+  for (const preset of PRESET_PATTERNS) {
+    const meta = await sharp(preset.localPath).metadata();
+    await prisma.pattern.upsert({
+      where: { id: preset.id },
+      update: {},
+      create: {
+        id: preset.id,
+        name: preset.name,
+        objectKey: preset.objectKey,
+        thumbnailKey: preset.thumbnailKey,
+        mime: 'image/png',
+        width: meta.width,
+        height: meta.height,
+        confirmed: true,
+        ownerId: null,
+        publishRequested: true,
+        isPublic: true,
+        status: 'APPROVED',
+      },
+    });
+  }
+  console.log(`Seeded ${PRESET_PATTERNS.length} preset patterns`);
 
   const tshirt = await prisma.garmentModel.upsert({
     where: { id: CATALOG_TSHIRT_ID },

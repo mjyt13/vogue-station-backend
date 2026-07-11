@@ -24,6 +24,7 @@
     "db:generate": "prisma generate",
     "db:seed": "nest build && node dist/database/seed.js",
     "storage:bootstrap": "nest build && node dist/storage/bootstrap-s3.js",
+    "openapi:emit": "nest build && node dist/openapi-emit.js",
     "minio:up:deck": "flatpak-spawn --host podman start vogue-minio"
   },
   "dependencies": {

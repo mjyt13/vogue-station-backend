@@ -18,6 +18,15 @@ export class UsersRepository {
     return this.prisma.user.findUnique({ where: { id } });
   }
 
+  findByIdWithCounts(id: string): Promise<UserWithCounts | null> {
+    return this.prisma.user.findUnique({
+      where: { id },
+      include: {
+        _count: { select: { colors: true, patterns: true, looks: true } },
+      },
+    });
+  }
+
   create(data: { email: string; passwordHash: string }): Promise<User> {
     return this.prisma.user.create({ data });
   }

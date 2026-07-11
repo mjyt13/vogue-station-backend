@@ -26,8 +26,9 @@ import {
 import type { StorageProvider } from '../storage/storage-provider.interface';
 import type { Pattern } from '../generated/prisma/client';
 import type { AccessTokenPayload } from '../auth/auth.types';
+import { moderationUpdate } from '../common/moderation';
+import type { ModerationAction } from '../common/moderation';
 import type { CreatePatternDto } from './dto/create-pattern.dto';
-import type { ModerationAction } from './dto/moderate-pattern.dto';
 
 const EXT_BY_MIME: Record<string, string> = {
   'image/png': 'png',
@@ -158,6 +159,23 @@ export class PatternsService {
     return Object.assign(new PatternDetailResponse(), base, { patternUrl });
   }
 
+  /** Owner asks for public listing; resubmitting after a reject is fine. */
+  async publish(
+    user: AccessTokenPayload,
+    id: string,
+  ): Promise<PatternResponse> {
+    const pattern = await this.getOwned(user, id);
+    if (!pattern.confirmed) {
+      throw new BadRequestException('Confirm the upload before publishing');
+    }
+    const updated = await this.patternsRepository.update(pattern.id, {
+      publishRequested: true,
+      status: ModerationStatus.PENDING,
+      isPublic: false,
+    });
+    return this.withThumbnail(updated);
+  }
+
   async delete(user: AccessTokenPayload, id: string): Promise<void> {
     const pattern = await this.getOwned(user, id);
     await this.storage.delete(pattern.objectKey);
@@ -165,13 +183,20 @@ export class PatternsService {
     await this.patternsRepository.deleteById(pattern.id);
   }
 
+  /** Admin view: unfiltered by default; the params narrow it down. */
   async listForModeration(
-    status: ModerationStatus,
+    status: ModerationStatus | undefined,
+    confirmed: boolean | undefined,
+    requested: boolean | undefined,
     page: number,
     limit: number,
   ): Promise<PaginatedPatternsResponse> {
     const { items, total } = await this.patternsRepository.findPage(
-      { status, confirmed: true },
+      {
+        ...(status ? { status } : {}),
+        ...(confirmed === undefined ? {} : { confirmed }),
+        ...(requested === undefined ? {} : { publishRequested: requested }),
+      },
       page,
       limit,
       'asc',
@@ -193,14 +218,15 @@ export class PatternsService {
     if (!pattern.confirmed) {
       throw new BadRequestException('Cannot moderate an unconfirmed upload');
     }
-    // is_public is gated behind moderation — approve is the only path to it.
-    const updated = await this.patternsRepository.update(id, {
-      status:
-        action === 'approve'
-          ? ModerationStatus.APPROVED
-          : ModerationStatus.REJECTED,
-      isPublic: action === 'approve',
-    });
+    if (!pattern.publishRequested) {
+      throw new BadRequestException(
+        'The owner has not requested publication of this pattern',
+      );
+    }
+    const updated = await this.patternsRepository.update(
+      id,
+      moderationUpdate(action),
+    );
     return this.withThumbnail(updated);
   }
 

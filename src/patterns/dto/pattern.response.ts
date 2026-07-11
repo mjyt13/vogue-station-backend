@@ -21,6 +21,9 @@ export class PatternResponse {
   @ApiProperty({ description: 'true once the upload passed validation' })
   confirmed: boolean;
 
+  @ApiProperty({ description: 'Owner asked for this pattern to go public' })
+  publishRequested: boolean;
+
   @ApiProperty({ enum: ModerationStatus })
   status: ModerationStatus;
 
@@ -47,6 +50,7 @@ export class PatternResponse {
       width: pattern.width,
       height: pattern.height,
       confirmed: pattern.confirmed,
+      publishRequested: pattern.publishRequested,
       status: pattern.status,
       isPublic: pattern.isPublic,
       ownerId: pattern.ownerId,

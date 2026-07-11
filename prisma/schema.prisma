@@ -20,7 +20,17 @@ enum GarmentKind {
   PANTS
 }
 
-// Shared by every moderated asset type (garment models now, patterns later).
+// THE PUBLISHING FLOW (shared by Pattern, GarmentModel and Look):
+// every user-shareable entity carries the same three fields —
+//   publishRequested  owner intent: set by POST /<entity>/:id/publish,
+//                     stays true forever so admins can re-moderate later
+//   status            the moderation verdict; PENDING until reviewed,
+//                     reset to PENDING on every (re-)publish request
+//   isPublic          visibility to other users; set to true ONLY by an
+//                     admin approval, never accepted from a client
+// Order of events: owner creates (private) → owner publishes → admin
+// approves/rejects → admin may reject again later to revoke publicity.
+// Allowed transitions live in the service layer, not in the DB.
 enum ModerationStatus {
   PENDING
   APPROVED
@@ -67,10 +77,15 @@ model Pattern {
   mime         String
   width        Int?
   height       Int?
-  // false until the client confirms the upload and the bytes are validated
+  // false until the upload is confirmed: bytes fetched from storage,
+  // magic-number/size/dimension checks passed, thumbnail generated.
+  // Unconfirmed patterns cannot be published, used in looks, or moderated.
   confirmed    Boolean          @default(false)
+  // null owner = official preset seeded by db:seed
   owner        User?            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   ownerId      String?          @map("owner_id")
+  // Publishing-flow trio — see the comment above ModerationStatus.
+  publishRequested Boolean      @default(false) @map("publish_requested")
   isPublic     Boolean          @default(false) @map("is_public")
   status       ModerationStatus @default(PENDING)
   createdAt    DateTime         @default(now()) @map("created_at")
@@ -87,9 +102,12 @@ model GarmentModel {
   name      String
   kind      GarmentKind
   objectKey String           @map("object_key")
-  // null owner = official catalog item
+  // null owner = official catalog item (seeded; visible to everyone)
   owner     User?            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   ownerId   String?          @map("owner_id")
+  // Publishing-flow trio — see the comment above ModerationStatus.
+  // Dormant until user model uploads exist: today all rows are seeded catalog.
+  publishRequested Boolean   @default(false) @map("publish_requested")
   isPublic  Boolean          @default(false) @map("is_public")
   status    ModerationStatus @default(PENDING)
   version   Int              @default(1)
@@ -106,10 +124,14 @@ model Look {
   name         String
   owner        User         @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   ownerId      String       @map("owner_id")
-  // Catalog models must not disappear from under saved looks.
+  // A look composes the other entities: model + color (+ optional pattern).
+  // Models must not disappear from under saved looks, hence Restrict.
   garmentModel GarmentModel @relation(fields: [garmentModelId], references: [id], onDelete: Restrict)
   garmentModelId String     @map("garment_model_id")
-  // Reference + snapshot: colorHex keeps rendering if the color is deleted.
+  // Reference + snapshot pair: colorId is the live reference (may be
+  // SetNull-ed when the color is deleted), colorHex is the snapshot that
+  // keeps the look rendering forever. patternId has no snapshot — a look
+  // whose pattern vanished renders color-only.
   color        Color?       @relation(fields: [colorId], references: [id], onDelete: SetNull)
   colorId      String?      @map("color_id")
   colorHex     String       @map("color_hex")
@@ -117,10 +139,18 @@ model Look {
   patternId    String?      @map("pattern_id")
   patternScale Float        @default(1) @map("pattern_scale")
   thumbnailKey String?      @map("thumbnail_key")
+  // Publishing-flow trio — see the comment above ModerationStatus.
+  // Extra service-layer rule: approving a look requires its referenced
+  // pattern and garment model to already be public, because the gallery
+  // must render (and filter by) them for every viewer.
+  publishRequested Boolean          @default(false) @map("publish_requested")
+  status           ModerationStatus @default(PENDING)
+  isPublic         Boolean          @default(false) @map("is_public")
   createdAt    DateTime     @default(now()) @map("created_at")
   updatedAt    DateTime     @updatedAt @map("updated_at")
 
   @@index([ownerId])
+  @@index([isPublic, status])
   @@map("looks")
 }
 

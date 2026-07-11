@@ -1,12 +1,12 @@
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
 import { json, urlencoded } from 'express';
 import type { NextFunction, Request, Response } from 'express';
 import { AppModule } from './app.module';
-import { REFRESH_COOKIE } from './auth/auth.controller';
+import { openApiConfig } from './openapi';
 
 async function bootstrap() {
   // Body parsing is registered manually so raw upload bytes streamed to
@@ -27,15 +27,6 @@ async function bootstrap() {
     credentials: true,
   });
 
-  const openApiConfig = new DocumentBuilder()
-    .setTitle('Vogue Station API')
-    .setDescription(
-      'Auth, garment models, colors, patterns and saved looks for the Vogue Station viewer.',
-    )
-    .setVersion('0.1.0')
-    .addBearerAuth()
-    .addCookieAuth(REFRESH_COOKIE)
-    .build();
   SwaggerModule.setup(
     'docs',
     app,

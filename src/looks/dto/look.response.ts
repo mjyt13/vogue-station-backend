@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { ModerationStatus } from '../../generated/prisma/enums';
 
 /** Mirror of the frontend viewer contract (features/viewer/types.ts). */
 export class GarmentMaterialDto {
@@ -36,6 +37,17 @@ export class LookResponse {
     description: 'Resolved, render-ready material for the viewer',
   })
   material: GarmentMaterialDto;
+
+  @ApiProperty({
+    description: 'Owner asked for this look to appear in the gallery',
+  })
+  publishRequested: boolean;
+
+  @ApiProperty({ enum: ModerationStatus })
+  status: ModerationStatus;
+
+  @ApiProperty()
+  isPublic: boolean;
 
   @ApiProperty()
   createdAt: Date;

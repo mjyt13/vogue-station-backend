@@ -25,6 +25,7 @@ const basePattern: Pattern = {
   height: null,
   confirmed: false,
   ownerId: 'u1',
+  publishRequested: false,
   isPublic: false,
   status: ModerationStatus.PENDING,
   createdAt: new Date(),
@@ -131,8 +132,34 @@ describe('PatternsService', () => {
     );
   });
 
+  it('publish flags a confirmed pattern; unconfirmed cannot publish', async () => {
+    repoMock.findById.mockResolvedValue({ ...basePattern, confirmed: true });
+    repoMock.update.mockImplementation((_id: string, data: object) =>
+      Promise.resolve({ ...basePattern, confirmed: true, ...data }),
+    );
+    const result = await service.publish(me, 'p1');
+    expect(result.publishRequested).toBe(true);
+    expect(result.isPublic).toBe(false);
+
+    repoMock.findById.mockResolvedValue(basePattern); // unconfirmed
+    await expect(service.publish(me, 'p1')).rejects.toThrow(
+      'Confirm the upload before publishing',
+    );
+  });
+
+  it('refuses to moderate a pattern nobody asked to publish', async () => {
+    repoMock.findById.mockResolvedValue({ ...basePattern, confirmed: true });
+    await expect(service.moderate('p1', 'approve')).rejects.toThrow(
+      'has not requested publication',
+    );
+  });
+
   it('approve makes the pattern public, reject does not', async () => {
-    const confirmed = { ...basePattern, confirmed: true };
+    const confirmed = {
+      ...basePattern,
+      confirmed: true,
+      publishRequested: true,
+    };
     repoMock.findById.mockResolvedValue(confirmed);
     repoMock.update.mockImplementation((_id: string, data: object) =>
       Promise.resolve({ ...confirmed, ...data }),

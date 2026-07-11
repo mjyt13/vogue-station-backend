@@ -34,6 +34,7 @@ describe('UsersService', () => {
     create: jest.fn(),
     update: jest.fn(),
     findPage: jest.fn(),
+    findByIdWithCounts: jest.fn(),
     deleteById: jest.fn(),
   };
   const tokensRepo = { deleteAllForUser: jest.fn() };
@@ -104,8 +105,16 @@ describe('UsersService', () => {
   it('revokes sessions on role change so the JWT role refreshes', async () => {
     usersRepo.findById.mockResolvedValue(user);
     usersRepo.update.mockResolvedValue({ ...user, role: Role.ADMIN });
+    usersRepo.findByIdWithCounts.mockResolvedValue({
+      ...user,
+      role: Role.ADMIN,
+      _count: { colors: 2, patterns: 1, looks: 3 },
+    });
 
-    await service.changeRole(admin, 'u1', Role.ADMIN);
+    const result = await service.changeRole(admin, 'u1', Role.ADMIN);
+
+    // Role change must not touch the user's content.
+    expect(result.counts).toEqual({ colors: 2, patterns: 1, looks: 3 });
 
     expect(usersRepo.update).toHaveBeenCalledWith('u1', { role: Role.ADMIN });
     expect(tokensRepo.deleteAllForUser).toHaveBeenCalledWith('u1');

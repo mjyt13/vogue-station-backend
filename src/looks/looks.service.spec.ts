@@ -39,6 +39,7 @@ const myPattern = {
   height: 512,
   confirmed: true,
   ownerId: 'u1',
+  publishRequested: false,
   isPublic: false,
   status: ModerationStatus.PENDING,
   createdAt: new Date(),
@@ -54,6 +55,9 @@ const baseLook: LookWithPattern = {
   patternId: 'p1',
   patternScale: 2,
   thumbnailKey: null,
+  publishRequested: false,
+  status: ModerationStatus.PENDING,
+  isPublic: false,
   createdAt: new Date(),
   updatedAt: new Date(),
   pattern: myPattern,
@@ -190,6 +194,57 @@ describe('LooksService', () => {
   it("404s someone else's look", async () => {
     looksRepo.findById.mockResolvedValue(baseLook);
     await expect(service.get(other, 'l1')).rejects.toThrow(NotFoundException);
+  });
+
+  it('publish flags the look for moderation; approve makes it public', async () => {
+    looksRepo.findById.mockResolvedValue(baseLook);
+    looksRepo.update.mockImplementation((_id: string, data: object) =>
+      Promise.resolve({ ...baseLook, ...data }),
+    );
+
+    const published = await service.publish(me, 'l1');
+    expect(published.publishRequested).toBe(true);
+    expect(published.isPublic).toBe(false);
+
+    // Approval requires the referenced assets to be public themselves.
+    modelsRepo.findById.mockResolvedValue(catalogModel);
+    looksRepo.findById.mockResolvedValue({
+      ...baseLook,
+      publishRequested: true,
+      pattern: {
+        ...myPattern,
+        isPublic: true,
+        status: ModerationStatus.APPROVED,
+      },
+    });
+    const approved = await service.moderate('l1', 'approve');
+    expect(approved.status).toBe(ModerationStatus.APPROVED);
+    expect(approved.isPublic).toBe(true);
+  });
+
+  it('refuses to approve a look whose pattern is still private', async () => {
+    modelsRepo.findById.mockResolvedValue(catalogModel);
+    looksRepo.findById.mockResolvedValue({
+      ...baseLook,
+      publishRequested: true, // pattern = myPattern: private, PENDING
+    });
+    await expect(service.moderate('l1', 'approve')).rejects.toThrow(
+      'Approve the referenced pattern first',
+    );
+    // rejecting needs no such check
+    looksRepo.update.mockResolvedValue({
+      ...baseLook,
+      publishRequested: true,
+      status: ModerationStatus.REJECTED,
+    });
+    await expect(service.moderate('l1', 'reject')).resolves.toBeDefined();
+  });
+
+  it('refuses to moderate a look nobody asked to publish', async () => {
+    looksRepo.findById.mockResolvedValue(baseLook);
+    await expect(service.moderate('l1', 'approve')).rejects.toThrow(
+      'has not requested publication',
+    );
   });
 
   it('update with a bare hex detaches the color reference', async () => {

@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Param,
+  ParseBoolPipe,
   ParseEnumPipe,
   ParseUUIDPipe,
   Patch,
@@ -14,11 +15,11 @@ import {
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
+import { ModerateDto } from '../common/moderation';
 import { Roles } from '../common/decorators/roles.decorator';
 import { PaginationQuery } from '../common/dto/pagination.query';
 import { ModerationStatus, Role } from '../generated/prisma/enums';
 import { PatternsService } from './patterns.service';
-import { ModeratePatternDto } from './dto/moderate-pattern.dto';
 import {
   PaginatedPatternsResponse,
   PatternResponse,
@@ -31,16 +32,25 @@ import {
 export class AdminPatternsController {
   constructor(private readonly patternsService: PatternsService) {}
 
+  /** No filters = everything; combine status/confirmed for the queue views. */
   @Get()
   @ApiQuery({ name: 'status', enum: ModerationStatus, required: false })
+  @ApiQuery({ name: 'confirmed', type: Boolean, required: false })
+  @ApiQuery({ name: 'requested', type: Boolean, required: false })
   @ApiOkResponse({ type: PaginatedPatternsResponse })
   list(
     @Query() query: PaginationQuery,
     @Query('status', new ParseEnumPipe(ModerationStatus, { optional: true }))
     status?: ModerationStatus,
+    @Query('confirmed', new ParseBoolPipe({ optional: true }))
+    confirmed?: boolean,
+    @Query('requested', new ParseBoolPipe({ optional: true }))
+    requested?: boolean,
   ): Promise<PaginatedPatternsResponse> {
     return this.patternsService.listForModeration(
-      status ?? ModerationStatus.PENDING,
+      status,
+      confirmed,
+      requested,
       query.page,
       query.limit,
     );
@@ -50,7 +60,7 @@ export class AdminPatternsController {
   @ApiOkResponse({ type: PatternResponse })
   moderate(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: ModeratePatternDto,
+    @Body() dto: ModerateDto,
   ): Promise<PatternResponse> {
     return this.patternsService.moderate(id, dto.action);
   }

@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { moderationUpdate } from '../common/moderation';
 import { colorPolicy } from '../colors/colors.policy';
 import { ColorsRepository } from '../colors/colors.repository';
 import { modelPolicy } from '../models/models.policy';
@@ -13,10 +14,13 @@ import { PatternsRepository } from '../patterns/patterns.repository';
 import { STORAGE_PROVIDER } from '../storage/storage-provider.interface';
 import { LooksRepository } from './looks.repository';
 import { LookResponse, PaginatedLooksResponse } from './dto/look.response';
+import { ModerationStatus } from '../generated/prisma/enums';
 import type { StorageProvider } from '../storage/storage-provider.interface';
+import type { ModerationAction } from '../common/moderation';
 import type { LookWithPattern } from './looks.repository';
 import type { AccessTokenPayload } from '../auth/auth.types';
 import type { CreateLookDto, UpdateLookDto } from './dto/create-look.dto';
+import type { GalleryQuery } from './dto/gallery.query';
 
 @Injectable()
 export class LooksService {
@@ -113,6 +117,100 @@ export class LooksService {
     await this.looksRepository.deleteById(look.id);
   }
 
+  /** Owner asks for gallery publication; resubmitting after a reject is fine. */
+  async publish(user: AccessTokenPayload, id: string): Promise<LookResponse> {
+    const look = await this.getOwned(user, id);
+    const updated = await this.looksRepository.update(look.id, {
+      publishRequested: true,
+      status: ModerationStatus.PENDING,
+      isPublic: false,
+    });
+    return this.toResponse(user, updated);
+  }
+
+  /** Public gallery: approved looks only, filterable by color/pattern. */
+  async gallery(
+    user: AccessTokenPayload,
+    query: GalleryQuery,
+  ): Promise<PaginatedLooksResponse> {
+    const { items, total } = await this.looksRepository.findPage(
+      {
+        isPublic: true,
+        status: ModerationStatus.APPROVED,
+        ...(query.colorId ? { colorId: query.colorId } : {}),
+        ...(query.patternId ? { patternId: query.patternId } : {}),
+      },
+      query.page,
+      query.limit,
+    );
+    return {
+      items: await Promise.all(
+        items.map((look) => this.toResponse(user, look)),
+      ),
+      total,
+      page: query.page,
+      limit: query.limit,
+    };
+  }
+
+  /** Admin queue: only looks whose owners asked for publication. */
+  async listForModeration(
+    status: ModerationStatus | undefined,
+    page: number,
+    limit: number,
+  ): Promise<PaginatedLooksResponse> {
+    const { items, total } = await this.looksRepository.findPage(
+      { publishRequested: true, ...(status ? { status } : {}) },
+      page,
+      limit,
+    );
+    return {
+      items: await Promise.all(
+        items.map((look) => this.toResponseAsAdmin(look)),
+      ),
+      total,
+      page,
+      limit,
+    };
+  }
+
+  async moderate(id: string, action: ModerationAction): Promise<LookResponse> {
+    const look = await this.looksRepository.findById(id);
+    if (!look) throw new NotFoundException('Look not found');
+    if (!look.publishRequested) {
+      throw new BadRequestException(
+        'The owner has not requested publication of this look',
+      );
+    }
+    // A gallery look must be renderable (and filterable) by everyone, so
+    // every referenced asset has to be public itself before approval.
+    if (action === 'approve') {
+      if (
+        look.pattern &&
+        !(look.pattern.isPublic && look.pattern.status === 'APPROVED')
+      ) {
+        throw new BadRequestException(
+          'Approve the referenced pattern first — gallery looks must only use public patterns',
+        );
+      }
+      const model = await this.modelsRepository.findById(look.garmentModelId);
+      const modelIsPublic =
+        model &&
+        (model.ownerId === null ||
+          (model.isPublic && model.status === 'APPROVED'));
+      if (!modelIsPublic) {
+        throw new BadRequestException(
+          'The referenced garment model must be public before the look can be approved',
+        );
+      }
+    }
+    const updated = await this.looksRepository.update(
+      id,
+      moderationUpdate(action),
+    );
+    return this.toResponseAsAdmin(updated);
+  }
+
   /** Looks are private: anyone else's look is a 404. */
   private async getOwned(
     user: AccessTokenPayload,
@@ -192,8 +290,16 @@ export class LooksService {
         patternUrl,
         patternScale: look.patternScale,
       },
+      publishRequested: look.publishRequested,
+      status: look.status,
+      isPublic: look.isPublic,
       createdAt: look.createdAt,
       updatedAt: look.updatedAt,
     });
+  }
+
+  /** Moderators must see the pattern even when it is private. */
+  private toResponseAsAdmin(look: LookWithPattern): Promise<LookResponse> {
+    return this.toResponse({ sub: 'admin', email: '', role: 'ADMIN' }, look);
   }
 }

@@ -21,6 +21,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { PaginationQuery } from '../common/dto/pagination.query';
 import { LooksService } from './looks.service';
 import { CreateLookDto, UpdateLookDto } from './dto/create-look.dto';
+import { GalleryQuery } from './dto/gallery.query';
 import { LookResponse, PaginatedLooksResponse } from './dto/look.response';
 import type { AccessTokenPayload } from '../auth/auth.types';
 
@@ -46,6 +47,26 @@ export class LooksController {
     @Body() dto: CreateLookDto,
   ): Promise<LookResponse> {
     return this.looksService.create(user, dto);
+  }
+
+  /** Public gallery of approved looks. Declared before :id on purpose. */
+  @Get('gallery')
+  @ApiOkResponse({ type: PaginatedLooksResponse })
+  gallery(
+    @CurrentUser() user: AccessTokenPayload,
+    @Query() query: GalleryQuery,
+  ): Promise<PaginatedLooksResponse> {
+    return this.looksService.gallery(user, query);
+  }
+
+  /** Ask for this look to be moderated into the public gallery. */
+  @Post(':id/publish')
+  @ApiOkResponse({ type: LookResponse })
+  publish(
+    @CurrentUser() user: AccessTokenPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<LookResponse> {
+    return this.looksService.publish(user, id);
   }
 
   @Get(':id')

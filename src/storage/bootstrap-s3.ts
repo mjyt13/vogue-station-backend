@@ -11,6 +11,8 @@ import {
   S3Client,
 } from '@aws-sdk/client-s3';
 import { readFile } from 'node:fs/promises';
+import sharp from 'sharp';
+import { PRESET_PATTERNS } from '../database/preset-patterns';
 
 const CATALOG_OBJECTS: { key: string; localPath: string; mime: string }[] = [
   {
@@ -18,6 +20,11 @@ const CATALOG_OBJECTS: { key: string; localPath: string; mime: string }[] = [
     localPath: 'storage/models/tshirt-v1.glb',
     mime: 'model/gltf-binary',
   },
+  ...PRESET_PATTERNS.map((preset) => ({
+    key: preset.objectKey,
+    localPath: preset.localPath,
+    mime: 'image/png',
+  })),
 ];
 
 async function main() {
@@ -39,8 +46,13 @@ async function main() {
     .then(() => true)
     .catch(() => false);
   if (!exists) {
-    await client.send(new CreateBucketCommand({ Bucket: bucket }));
-    console.log(`Created bucket ${bucket}`);
+    await client
+      .send(new CreateBucketCommand({ Bucket: bucket }))
+      .catch((error: Error & { Code?: string }) => {
+        // Race/HeadBucket quirks: an already-owned bucket is success here.
+        if (error.Code !== 'BucketAlreadyOwnedByYou') throw error;
+      });
+    console.log(`Bucket ${bucket} ready`);
   } else {
     console.log(`Bucket ${bucket} already exists`);
   }
@@ -56,6 +68,23 @@ async function main() {
       }),
     );
     console.log(`Uploaded ${obj.key} (${body.length} bytes)`);
+  }
+
+  // Gallery thumbnails for the preset patterns.
+  for (const preset of PRESET_PATTERNS) {
+    const thumbnail = await sharp(preset.localPath)
+      .resize(256, 256, { fit: 'cover' })
+      .webp({ quality: 80 })
+      .toBuffer();
+    await client.send(
+      new PutObjectCommand({
+        Bucket: bucket,
+        Key: preset.thumbnailKey,
+        Body: thumbnail,
+        ContentType: 'image/webp',
+      }),
+    );
+    console.log(`Uploaded ${preset.thumbnailKey}`);
   }
 }
 

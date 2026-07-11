@@ -105,13 +105,13 @@ export class UsersService {
       throw new BadRequestException('You cannot change your own role');
     }
     await this.findByIdOrThrow(userId);
-    const updated = await this.usersRepository.update(userId, { role });
+    await this.usersRepository.update(userId, { role });
     // Role lives inside issued JWTs; kill sessions so it takes effect now.
     await this.refreshTokens.deleteAllForUser(userId);
-    return toAdminResponse({
-      ...updated,
-      _count: { colors: 0, patterns: 0, looks: 0 },
-    });
+    // Refetch with content counts — only the role changed, nothing is touched.
+    const updated = await this.usersRepository.findByIdWithCounts(userId);
+    if (!updated) throw new NotFoundException('User not found');
+    return toAdminResponse(updated);
   }
 
   async deleteByAdmin(

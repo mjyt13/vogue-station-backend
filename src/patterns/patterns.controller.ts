@@ -62,6 +62,17 @@ export class PatternsController {
     return this.patternsService.confirm(user, id);
   }
 
+  /** Ask for this pattern to be moderated into the public catalog. */
+  @Post(':id/publish')
+  @HttpCode(HttpStatus.OK)
+  @ApiOkResponse({ type: PatternResponse })
+  publish(
+    @CurrentUser() user: AccessTokenPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<PatternResponse> {
+    return this.patternsService.publish(user, id);
+  }
+
   @Get(':id')
   @ApiOkResponse({ type: PatternDetailResponse })
   get(
