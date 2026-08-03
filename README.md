@@ -1,98 +1,153 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+<div align="center">
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+# Vogue Station — Backend
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+**The API behind the live 3D garment editor: accounts, uploads, moderation, and the public gallery.**
 
-## Description
+[![NestJS](https://img.shields.io/badge/NestJS-11-e0234e?logo=nestjs&logoColor=white)](https://nestjs.com)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-4169e1?logo=postgresql&logoColor=white)](https://www.postgresql.org)
+[![Prisma](https://img.shields.io/badge/Prisma-7-2d3748?logo=prisma&logoColor=white)](https://www.prisma.io)
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+</div>
 
-## Project setup
+<br>
+
+## What this is
+
+The API for [Vogue Station](https://github.com/mjyt13/vogue-station-frontend),
+a full-stack pet project: a live 3D garment editor backed by real
+infrastructure rather than a mocked API. This service owns accounts,
+user-submitted content (garment models, colors, patterns, looks), object
+storage, and the admin moderation queue that gates what becomes public.
+
+- [**vogue-station-frontend**](https://github.com/mjyt13/vogue-station-frontend) — the React + three.js editor, cabinet, gallery, and admin UI.
+- **This repo** — NestJS API, Prisma/Postgres, S3-compatible storage, JWT auth, moderation.
+
+## Features
+
+- **Accounts** — register/login, JWT access token + rotating httpOnly refresh
+  cookie, role-based access control (`USER` / `ADMIN`) enforced by guards on
+  every route.
+- **Garment models, colors, patterns** — CRUD for the three building blocks
+  of a look. Uploads (a `.glb` model, a pattern image) are validated
+  server-side (magic bytes, size, dimensions) and thumbnailed with `sharp`
+  before being marked `confirmed`; unconfirmed assets can't be published or
+  used in a look.
+  - Global presets (owner-less rows, seeded) sit alongside user-submitted
+    assets in the same tables.
+- **Looks** — a look composes a model + color (+ optional pattern) into
+  something a user can save, reopen, and re-save. `colorHex` is snapshotted
+  onto the look so it keeps rendering even if the color is later edited or
+  deleted; `patternId`/`garmentModelId` are live references instead
+  (deleting a model in use is blocked at the DB level).
+- **Publishing + moderation** — every shareable entity (model, color,
+  pattern, look) carries the same three-field flow: `publishRequested` (owner
+  intent) → `status` (admin verdict: `PENDING`/`APPROVED`/`REJECTED`) →
+  `isPublic` (visibility, settable only by an admin approval). A look can
+  only be approved once the model and pattern it references are already
+  public. See the comment above `ModerationStatus` in
+  [prisma/schema.prisma](prisma/schema.prisma) for the full state diagram.
+- **Admin endpoints** — `admin/{users,models,colors,patterns,looks}`:
+  list-with-filters, approve/reject, promote/demote a user's role, delete a
+  user (cascades their content).
+- **Object storage** — pluggable driver: `local` filesystem for zero-setup
+  dev, or any S3-compatible store (MinIO locally, Cloudflare R2/AWS in
+  prod) via presigned URLs, selected by `STORAGE_DRIVER`.
+- **OpenAPI spec** — the frontend's typed API client is generated from this
+  service's Swagger document (served at `/docs`, emitted to a JSON file by
+  `npm run openapi:emit`).
+
+## Tech stack
+
+| Layer      | Choice                                                                      |
+| ---------- | ---------------------------------------------------------------------------- |
+| Core       | NestJS 11, TypeScript                                                        |
+| Data       | Prisma 7 (`@prisma/adapter-pg`) + PostgreSQL 17                              |
+| Auth       | `@nestjs/jwt`, argon2 password hashing, httpOnly rotating refresh cookie     |
+| Validation | class-validator / class-transformer, global `ValidationPipe`                |
+| Storage    | `@aws-sdk/client-s3` + presigned URLs (S3-compatible) or local filesystem   |
+| Images     | `sharp` for thumbnail generation and upload validation                      |
+| API docs   | `@nestjs/swagger`, served at `/docs`                                        |
+| Rate limit | `@nestjs/throttler` (global guard)                                          |
+
+## Architecture notes
+
+- **Feature modules per entity** — `auth`, `users`, `models`, `colors`,
+  `patterns`, `looks`, `storage`, each with its own controller(s), service,
+  and DTOs. Admin-only routes live in a separate `admin-*.controller.ts`
+  per module rather than branching inside the public controller.
+- **Guard order matters**: throttle → authenticate (`AccessTokenGuard`) →
+  authorize (`RolesGuard`), wired globally in [src/app.module.ts](src/app.module.ts).
+- **The moderation trio lives on four entities, not one shared table** —
+  `publishRequested` / `status` / `isPublic` are duplicated fields on
+  `GarmentModel`, `Color`, `Pattern`, and `Look` rather than a generic
+  polymorphic "moderatable" join, so each entity keeps its own indexes and
+  FK constraints simple. Allowed transitions are enforced in the service
+  layer, not the DB.
+- **Reference vs. snapshot** — a `Look` snapshots `colorHex` (so edits/deletes
+  to a `Color` never change a saved look's render) but keeps live foreign
+  keys to `GarmentModel`/`Pattern` (so those must stay valid — deleting a
+  model that's in use is restricted, deleting a pattern in use nulls the
+  reference and the look renders color-only).
+- **Body parsing is manual** in [src/main.ts](src/main.ts): `bodyParser: false` on the Nest
+  app, then `json`/`urlencoded` are wired by hand and explicitly skipped for
+  `/storage/*` so raw upload bytes streamed to that route aren't consumed
+  before the storage handler sees them.
+- **Storage driver is swappable** without touching callers — `STORAGE_DRIVER=local`
+  writes to `STORAGE_LOCAL_ROOT` on disk for zero-setup dev; `s3` points at
+  MinIO/R2/AWS via presigned URLs. Same interface either way.
+
+## Getting started
+
+You'll need Postgres and an S3-compatible store (or just use the `local`
+storage driver to skip the latter). The frontend
+([`vogue-station-frontend`](https://github.com/mjyt13/vogue-station-frontend))
+expects this API at `http://localhost:3000`.
 
 ```bash
-$ npm install
+npm install
+cp .env.example .env      # fill in secrets — see below
+
+npm run db:up              # Postgres via docker compose (Steam Deck: db:up:deck, podman)
+# npm run minio:up:deck     # only if STORAGE_DRIVER=s3 and using podman/MinIO locally
+
+npm run db:migrate         # apply Prisma migrations
+npm run db:seed            # admin user + preset colors/patterns/catalog model
+npm run storage:bootstrap  # create the bucket (s3 driver) / seed dirs (local) + upload catalog assets
+
+npm run start:dev          # → http://localhost:3000, Swagger UI at /docs
 ```
 
-## Compile and run the project
+### Environment
+
+See [.env.example](.env.example) for the full list with generation hints. The
+essentials:
+
+| Variable                | Purpose                                                        |
+| ------------------------ | --------------------------------------------------------------- |
+| `DATABASE_URL`           | Postgres connection string                                     |
+| `JWT_ACCESS_SECRET`      | Signs access tokens (`openssl rand -base64 48`)                |
+| `STORAGE_SIGNING_SECRET` | Signs local-driver storage URLs (`openssl rand -base64 48`)    |
+| `STORAGE_DRIVER`         | `local` (filesystem, zero setup) or `s3` (MinIO/R2/AWS)         |
+| `S3_*`                   | Only required when `STORAGE_DRIVER=s3`                          |
+| `CORS_ORIGIN`            | Must match the frontend's origin (default `http://localhost:5173`) |
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | Optional — promoted/created by `npm run db:seed`         |
+
+### Scripts
 
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+npm run start:dev      # watch mode
+npm run test            # unit tests
+npm run test:e2e        # e2e tests
+npm run lint             # eslint --fix
+npm run db:generate     # regenerate the Prisma client after a schema change
+npm run openapi:emit    # write the current OpenAPI spec to docs/openapi.json
 ```
 
-## Run tests
+## API docs
 
-```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
-```
-
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
-```
-
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+With the server running, interactive Swagger UI is at
+[`http://localhost:3000/docs`](http://localhost:3000/docs). A static snapshot
+of the spec is checked in at [docs/openapi.json](docs/openapi.json) and is
+what the frontend's typed client is generated from.
