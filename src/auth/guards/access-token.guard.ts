@@ -22,10 +22,24 @@ export class AccessTokenGuard implements CanActivate {
       context.getHandler(),
       context.getClass(),
     ]);
-    if (isPublic) return true;
 
     const request = context.switchToHttp().getRequest<Request>();
     const [scheme, token] = request.headers.authorization?.split(' ') ?? [];
+
+    if (isPublic) {
+      // Anonymous is fine here, but still identify the caller when a valid
+      // token is present so owner/"mine" visibility keeps working.
+      if (scheme === 'Bearer' && token) {
+        try {
+          request.user =
+            await this.jwtService.verifyAsync<AccessTokenPayload>(token);
+        } catch {
+          // Bad token on a public route: proceed as anonymous rather than 401.
+        }
+      }
+      return true;
+    }
+
     if (scheme !== 'Bearer' || !token) {
       throw new UnauthorizedException('Missing access token');
     }

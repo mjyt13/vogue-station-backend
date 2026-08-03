@@ -60,12 +60,16 @@ model Color {
   // null owner = global preset visible to everyone
   owner     User?    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   ownerId   String?  @map("owner_id")
-  isPublic  Boolean  @default(false) @map("is_public")
+  // Publishing-flow trio — see the comment above ModerationStatus.
+  publishRequested Boolean          @default(false) @map("publish_requested")
+  isPublic  Boolean          @default(false) @map("is_public")
+  status    ModerationStatus @default(PENDING)
   createdAt DateTime @default(now()) @map("created_at")
   looks     Look[]
 
   @@index([ownerId])
-  @@index([isPublic])
+  @@index([isPublic, status])
+  @@index([status])
   @@map("colors")
 }
 
@@ -102,11 +106,15 @@ model GarmentModel {
   name      String
   kind      GarmentKind
   objectKey String           @map("object_key")
+  thumbnailKey String?       @map("thumbnail_key")
+  // false until the upload is confirmed: bytes fetched from storage, magic-byte
+  // checked, thumbnail (client-rendered) validated and normalized. Unconfirmed
+  // models cannot be published, used in looks, or moderated.
+  confirmed Boolean          @default(false)
   // null owner = official catalog item (seeded; visible to everyone)
   owner     User?            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   ownerId   String?          @map("owner_id")
   // Publishing-flow trio — see the comment above ModerationStatus.
-  // Dormant until user model uploads exist: today all rows are seeded catalog.
   publishRequested Boolean   @default(false) @map("publish_requested")
   isPublic  Boolean          @default(false) @map("is_public")
   status    ModerationStatus @default(PENDING)
@@ -116,6 +124,7 @@ model GarmentModel {
 
   @@index([ownerId])
   @@index([isPublic, status])
+  @@index([status])
   @@map("garment_models")
 }
 

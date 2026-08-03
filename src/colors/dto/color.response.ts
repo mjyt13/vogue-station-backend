@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { ModerationStatus } from '../../generated/prisma/enums';
 import type { Color } from '../../generated/prisma/client';
 
 export class ColorResponse {
@@ -13,6 +14,12 @@ export class ColorResponse {
 
   @ApiProperty({ description: 'null = global preset', nullable: true })
   ownerId: string | null;
+
+  @ApiProperty()
+  publishRequested: boolean;
+
+  @ApiProperty({ enum: ModerationStatus })
+  status: ModerationStatus;
 
   @ApiProperty()
   isPublic: boolean;

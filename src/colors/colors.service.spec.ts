@@ -11,6 +11,8 @@ const ownColor: Color = {
   name: 'Mine',
   hex: '#112233',
   ownerId: 'u1',
+  publishRequested: false,
+  status: 'PENDING',
   isPublic: false,
   createdAt: new Date(),
 };

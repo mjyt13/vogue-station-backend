@@ -93,12 +93,13 @@ async function main() {
 
   const tshirt = await prisma.garmentModel.upsert({
     where: { id: CATALOG_TSHIRT_ID },
-    update: {},
+    update: { confirmed: true },
     create: {
       id: CATALOG_TSHIRT_ID,
       name: 'Basic T-Shirt',
       kind: 'TSHIRT',
       objectKey: 'models/tshirt-v1.glb',
+      confirmed: true,
       ownerId: null,
       isPublic: true,
       status: 'APPROVED',

@@ -138,6 +138,7 @@ export class UsersService {
       ...patternKeys.map((p) => p.objectKey),
       ...patternKeys.flatMap((p) => (p.thumbnailKey ? [p.thumbnailKey] : [])),
       ...modelKeys.map((m) => m.objectKey),
+      ...modelKeys.flatMap((m) => (m.thumbnailKey ? [m.thumbnailKey] : [])),
     ];
     await Promise.all(keys.map((key) => this.storage.delete(key)));
     await this.usersRepository.deleteById(userId);

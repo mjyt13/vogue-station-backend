@@ -4,6 +4,7 @@ import {
   Inject,
   Injectable,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import sharp from 'sharp';
@@ -124,13 +125,16 @@ export class PatternsService {
   }
 
   async list(
-    user: AccessTokenPayload,
+    user: AccessTokenPayload | undefined,
     page: number,
     limit: number,
     mine = false,
   ): Promise<PaginatedPatternsResponse> {
+    if (mine && !user) {
+      throw new UnauthorizedException('Sign in to view your patterns');
+    }
     const { items, total } = await this.patternsRepository.findPage(
-      mine ? { ownerId: user.sub } : patternPolicy.whereVisibleTo(user),
+      mine ? { ownerId: user!.sub } : patternPolicy.whereVisibleTo(user),
       page,
       limit,
     );
@@ -143,7 +147,7 @@ export class PatternsService {
   }
 
   async get(
-    user: AccessTokenPayload,
+    user: AccessTokenPayload | undefined,
     id: string,
   ): Promise<PatternDetailResponse> {
     const pattern = await this.patternsRepository.findById(id);

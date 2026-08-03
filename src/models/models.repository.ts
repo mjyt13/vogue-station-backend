@@ -28,11 +28,34 @@ export class ModelsRepository {
     return this.prisma.garmentModel.findUnique({ where: { id } });
   }
 
+  create(data: {
+    id: string;
+    name: string;
+    kind: Prisma.GarmentModelCreateInput['kind'];
+    objectKey: string;
+    ownerId: string;
+  }): Promise<GarmentModel> {
+    return this.prisma.garmentModel.create({ data });
+  }
+
+  update(
+    id: string,
+    data: Prisma.GarmentModelUpdateInput,
+  ): Promise<GarmentModel> {
+    return this.prisma.garmentModel.update({ where: { id }, data });
+  }
+
+  async deleteById(id: string): Promise<void> {
+    await this.prisma.garmentModel.delete({ where: { id } });
+  }
+
   /** Object keys of a user's uploaded models — for storage cleanup on user deletion. */
-  findKeysByOwner(ownerId: string): Promise<{ objectKey: string }[]> {
+  findKeysByOwner(
+    ownerId: string,
+  ): Promise<{ objectKey: string; thumbnailKey: string | null }[]> {
     return this.prisma.garmentModel.findMany({
       where: { ownerId },
-      select: { objectKey: true },
+      select: { objectKey: true, thumbnailKey: true },
     });
   }
 }

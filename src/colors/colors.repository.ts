@@ -32,6 +32,10 @@ export class ColorsRepository {
     return this.prisma.color.create({ data });
   }
 
+  update(id: string, data: Prisma.ColorUpdateInput): Promise<Color> {
+    return this.prisma.color.update({ where: { id }, data });
+  }
+
   async deleteById(id: string): Promise<void> {
     await this.prisma.color.delete({ where: { id } });
   }

@@ -17,6 +17,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { Public } from '../common/decorators/public.decorator';
 import { PaginationQuery } from '../common/dto/pagination.query';
 import { PatternsService } from './patterns.service';
 import { CreatePatternDto } from './dto/create-pattern.dto';
@@ -34,10 +35,12 @@ import type { AccessTokenPayload } from '../auth/auth.types';
 export class PatternsController {
   constructor(private readonly patternsService: PatternsService) {}
 
+  // Public: the editor's catalog is browsable before signing in.
+  @Public()
   @Get()
   @ApiOkResponse({ type: PaginatedPatternsResponse })
   list(
-    @CurrentUser() user: AccessTokenPayload,
+    @CurrentUser() user: AccessTokenPayload | undefined,
     @Query() query: PaginationQuery,
   ): Promise<PaginatedPatternsResponse> {
     return this.patternsService.list(user, query.page, query.limit, query.mine);
@@ -73,10 +76,11 @@ export class PatternsController {
     return this.patternsService.publish(user, id);
   }
 
+  @Public()
   @Get(':id')
   @ApiOkResponse({ type: PatternDetailResponse })
   get(
-    @CurrentUser() user: AccessTokenPayload,
+    @CurrentUser() user: AccessTokenPayload | undefined,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<PatternDetailResponse> {
     return this.patternsService.get(user, id);
