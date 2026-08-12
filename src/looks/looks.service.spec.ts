@@ -240,6 +240,33 @@ describe('LooksService', () => {
     await expect(service.moderate('l1', 'reject')).resolves.toBeDefined();
   });
 
+  it('refuses to approve a look whose referenced color is still private', async () => {
+    modelsRepo.findById.mockResolvedValue(catalogModel);
+    colorsRepo.findById.mockResolvedValue({
+      id: 'c1',
+      name: 'Custom Navy',
+      hex: '#1f3a5f',
+      ownerId: 'u1',
+      publishRequested: false,
+      status: ModerationStatus.PENDING,
+      isPublic: false,
+      createdAt: new Date(),
+    });
+    looksRepo.findById.mockResolvedValue({
+      ...baseLook,
+      publishRequested: true,
+      colorId: 'c1',
+      pattern: {
+        ...myPattern,
+        isPublic: true,
+        status: ModerationStatus.APPROVED,
+      },
+    });
+    await expect(service.moderate('l1', 'approve')).rejects.toThrow(
+      'Approve the referenced color first',
+    );
+  });
+
   it('refuses to moderate a look nobody asked to publish', async () => {
     looksRepo.findById.mockResolvedValue(baseLook);
     await expect(service.moderate('l1', 'approve')).rejects.toThrow(

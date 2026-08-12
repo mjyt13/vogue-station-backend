@@ -193,6 +193,18 @@ export class LooksService {
           'Approve the referenced pattern first — gallery looks must only use public patterns',
         );
       }
+      if (look.colorId) {
+        const color = await this.colorsRepository.findById(look.colorId);
+        const colorIsPublic =
+          color &&
+          (color.ownerId === null ||
+            (color.isPublic && color.status === 'APPROVED'));
+        if (!colorIsPublic) {
+          throw new BadRequestException(
+            'Approve the referenced color first — gallery looks must only use public colors',
+          );
+        }
+      }
       const model = await this.modelsRepository.findById(look.garmentModelId);
       const modelIsPublic =
         model &&
