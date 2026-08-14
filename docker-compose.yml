@@ -7,9 +7,86 @@ services:
       POSTGRES_PASSWORD: vogue
       POSTGRES_DB: vogue_station
     ports:
-      - '5432:5432'
+      # Bound to loopback only: Docker publishes ports via iptables, which
+      # bypasses ufw — '5432:5432' would be reachable from the whole internet
+      # on a public server. Nothing outside this host needs to reach Postgres
+      # directly.
+      - '127.0.0.1:5432:5432'
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U vogue -d vogue_station']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: vogue-minio
+      MINIO_ROOT_PASSWORD: vogue-minio
+    ports:
+      # Loopback only — see the note on db's port above. The app reaches
+      # MinIO over the internal Compose network (S3_ENDPOINT=http://minio:9000);
+      # this published port only exists for host-side scripts like
+      # storage:bootstrap and admin debugging.
+      - '127.0.0.1:9000:9000'
+    volumes:
+      - minio-data:/data
+    command: server /data
+    healthcheck:
+      test: ['CMD', 'mc', 'ready', 'local']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: build # has devDependencies (prisma CLI) — runtime stage doesn't
+    command: npx prisma migrate deploy
+    environment:
+      DATABASE_URL: postgresql://vogue:vogue@db:5432/vogue_station?schema=public
+    depends_on:
+      db:
+        condition: service_healthy
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      # Loopback only — a reverse proxy (Caddy/nginx) on the host terminates
+      # TLS on 80/443 and forwards to 127.0.0.1:3000. Never publish the app
+      # itself on a public interface: no TLS, no rate-limit-friendly edge.
+      - '127.0.0.1:3000:3000'
+    environment:
+      DATABASE_URL: postgresql://vogue:vogue@db:5432/vogue_station?schema=public
+      PORT: '3000'
+      APP_URL: ${APP_URL:-http://localhost:3000}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?set JWT_ACCESS_SECRET in .env}
+      JWT_ACCESS_TTL: 15m
+      REFRESH_TOKEN_TTL_DAYS: '30'
+      STORAGE_DRIVER: s3
+      STORAGE_SIGNING_SECRET: ${STORAGE_SIGNING_SECRET:?set STORAGE_SIGNING_SECRET in .env}
+      S3_ENDPOINT: http://minio:9000
+      S3_REGION: us-east-1
+      S3_BUCKET: vogue-station
+      S3_ACCESS_KEY_ID: vogue-minio
+      S3_SECRET_ACCESS_KEY: vogue-minio
+      S3_FORCE_PATH_STYLE: 'true'
+    depends_on:
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
 volumes:
   pgdata:
+  minio-data:

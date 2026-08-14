@@ -4,16 +4,26 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import sharp from 'sharp';
 import { moderationUpdate } from '../common/moderation';
 import { colorPolicy } from '../colors/colors.policy';
 import { ColorsRepository } from '../colors/colors.repository';
 import { modelPolicy } from '../models/models.policy';
 import { ModelsRepository } from '../models/models.repository';
+import {
+  MAX_LOOK_PREVIEW_BYTES,
+  sniffImageMime,
+  THUMBNAIL_SIZE,
+} from '../patterns/image-validation';
 import { patternPolicy } from '../patterns/patterns.policy';
 import { PatternsRepository } from '../patterns/patterns.repository';
 import { STORAGE_PROVIDER } from '../storage/storage-provider.interface';
 import { LooksRepository } from './looks.repository';
-import { LookResponse, PaginatedLooksResponse } from './dto/look.response';
+import {
+  LookPreviewUploadResponse,
+  LookResponse,
+  PaginatedLooksResponse,
+} from './dto/look.response';
 import { ModerationStatus } from '../generated/prisma/enums';
 import type { StorageProvider } from '../storage/storage-provider.interface';
 import type { ModerationAction } from '../common/moderation';
@@ -21,6 +31,11 @@ import type { LookWithPattern } from './looks.repository';
 import type { AccessTokenPayload } from '../auth/auth.types';
 import type { CreateLookDto, UpdateLookDto } from './dto/create-look.dto';
 import type { GalleryQuery } from './dto/gallery.query';
+
+/** Raw, unvalidated upload target — never signed out to readers. */
+function rawPreviewKey(ownerId: string, id: string): string {
+  return `looks/${ownerId}/${id}.preview.png`;
+}
 
 @Injectable()
 export class LooksService {
@@ -114,7 +129,64 @@ export class LooksService {
 
   async delete(user: AccessTokenPayload, id: string): Promise<void> {
     const look = await this.getOwned(user, id);
+    if (look.thumbnailKey) await this.storage.delete(look.thumbnailKey);
     await this.looksRepository.deleteById(look.id);
+  }
+
+  /** Hand out a presigned PUT for the client-rendered preview of this look.
+   * Call again after create/update whenever the composed material changed. */
+  async requestPreviewUpload(
+    user: AccessTokenPayload,
+    id: string,
+  ): Promise<LookPreviewUploadResponse> {
+    const look = await this.getOwned(user, id);
+    const uploadUrl = await this.storage.putSignedUrl(
+      rawPreviewKey(user.sub, look.id),
+    );
+    return { uploadUrl };
+  }
+
+  /** Validate the uploaded PNG, derive the gallery thumbnail, store its key. */
+  async confirmPreview(
+    user: AccessTokenPayload,
+    id: string,
+  ): Promise<LookResponse> {
+    const look = await this.getOwned(user, id);
+    const rawKey = rawPreviewKey(user.sub, look.id);
+
+    const rawBytes = await this.storage
+      .getObject(rawKey, MAX_LOOK_PREVIEW_BYTES)
+      .catch(() => {
+        throw new BadRequestException(
+          `Preview upload exceeds ${MAX_LOOK_PREVIEW_BYTES / (1024 * 1024)} MB`,
+        );
+      });
+    if (!rawBytes) {
+      throw new BadRequestException(
+        'No uploaded preview found for this look — upload a rendered preview first',
+      );
+    }
+    if (sniffImageMime(rawBytes) !== 'image/png') {
+      await this.storage.delete(rawKey);
+      throw new BadRequestException('Preview must be a PNG image');
+    }
+
+    const thumbnailKey = `thumbnails/looks/${look.id}.webp`;
+    const thumbnail = await sharp(rawBytes)
+      .resize(THUMBNAIL_SIZE, THUMBNAIL_SIZE, { fit: 'cover' })
+      .webp({ quality: 80 })
+      .toBuffer();
+    await this.storage.putObject(thumbnailKey, thumbnail);
+    await this.storage.delete(rawKey);
+
+    if (look.thumbnailKey && look.thumbnailKey !== thumbnailKey) {
+      await this.storage.delete(look.thumbnailKey);
+    }
+
+    const updated = await this.looksRepository.update(look.id, {
+      thumbnailKey,
+    });
+    return this.toResponse(user, updated);
   }
 
   /** Owner asks for gallery publication; resubmitting after a reject is fine. */
@@ -290,6 +362,9 @@ export class LooksService {
     const patternUrl = patternUsable
       ? await this.storage.getSignedUrl(look.pattern!.objectKey)
       : null;
+    const thumbnailUrl = look.thumbnailKey
+      ? await this.storage.getSignedUrl(look.thumbnailKey)
+      : null;
 
     return Object.assign(new LookResponse(), {
       id: look.id,
@@ -305,6 +380,7 @@ export class LooksService {
       publishRequested: look.publishRequested,
       status: look.status,
       isPublic: look.isPublic,
+      thumbnailUrl,
       createdAt: look.createdAt,
       updatedAt: look.updatedAt,
     });

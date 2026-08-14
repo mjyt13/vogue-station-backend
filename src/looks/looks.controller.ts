@@ -22,7 +22,11 @@ import { PaginationQuery } from '../common/dto/pagination.query';
 import { LooksService } from './looks.service';
 import { CreateLookDto, UpdateLookDto } from './dto/create-look.dto';
 import { GalleryQuery } from './dto/gallery.query';
-import { LookResponse, PaginatedLooksResponse } from './dto/look.response';
+import {
+  LookPreviewUploadResponse,
+  LookResponse,
+  PaginatedLooksResponse,
+} from './dto/look.response';
 import type { AccessTokenPayload } from '../auth/auth.types';
 
 @ApiTags('looks')
@@ -86,6 +90,28 @@ export class LooksController {
     @Body() dto: UpdateLookDto,
   ): Promise<LookResponse> {
     return this.looksService.update(user, id, dto);
+  }
+
+  /** Ask for a presigned PUT to upload a client-rendered static preview.
+   * Call again after create/update whenever the composed look changed. */
+  @Post(':id/preview')
+  @ApiOkResponse({ type: LookPreviewUploadResponse })
+  requestPreviewUpload(
+    @CurrentUser() user: AccessTokenPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<LookPreviewUploadResponse> {
+    return this.looksService.requestPreviewUpload(user, id);
+  }
+
+  /** Validate the uploaded preview and expose it as thumbnailUrl everywhere. */
+  @Post(':id/preview/confirm')
+  @HttpCode(HttpStatus.OK)
+  @ApiOkResponse({ type: LookResponse })
+  confirmPreview(
+    @CurrentUser() user: AccessTokenPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<LookResponse> {
+    return this.looksService.confirmPreview(user, id);
   }
 
   @Delete(':id')

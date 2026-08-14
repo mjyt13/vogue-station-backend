@@ -19,3 +19,4 @@ const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 export const MAX_PATTERN_BYTES = 10 * 1024 * 1024; // 10 MB
 export const MAX_PATTERN_DIMENSION = 4096; // px
 export const THUMBNAIL_SIZE = 256; // px
+export const MAX_LOOK_PREVIEW_BYTES = 5 * 1024 * 1024; // 5 MB

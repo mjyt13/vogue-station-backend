@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ModerationStatus } from '../../generated/prisma/enums';
 
 /** Mirror of the frontend viewer contract (features/viewer/types.ts). */
@@ -49,6 +49,13 @@ export class LookResponse {
   @ApiProperty()
   isPublic: boolean;
 
+  @ApiPropertyOptional({
+    nullable: true,
+    description:
+      'Short-lived presigned URL of the client-rendered static preview, or null until one is confirmed',
+  })
+  thumbnailUrl: string | null;
+
   @ApiProperty()
   createdAt: Date;
 
@@ -68,4 +75,12 @@ export class PaginatedLooksResponse {
 
   @ApiProperty()
   limit: number;
+}
+
+export class LookPreviewUploadResponse {
+  @ApiProperty({
+    description:
+      'Presigned PUT URL: upload the client-rendered PNG preview here, then call /looks/{id}/preview/confirm',
+  })
+  uploadUrl: string;
 }
