@@ -21,7 +21,7 @@ services:
       retries: 10
 
   minio:
-    image: minio/minio:latest
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
     restart: unless-stopped
     environment:
       MINIO_ROOT_USER: vogue-minio
@@ -74,6 +74,10 @@ services:
       STORAGE_DRIVER: s3
       STORAGE_SIGNING_SECRET: ${STORAGE_SIGNING_SECRET:?set STORAGE_SIGNING_SECRET in .env}
       S3_ENDPOINT: http://minio:9000
+      # Public origin browsers can actually reach — defaults to the
+      # locally-published MinIO port; override in .env for real deploys
+      # (e.g. https://your-domain/storage, proxied to this container).
+      S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT:-http://localhost:9000}
       S3_REGION: us-east-1
       S3_BUCKET: vogue-station
       S3_ACCESS_KEY_ID: vogue-minio

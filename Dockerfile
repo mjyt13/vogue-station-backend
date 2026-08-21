@@ -5,7 +5,7 @@
 # source here; sharp resolves its @img/sharp-linuxmusl-* optional deps here
 # too. Both MUST be installed inside this musl (alpine) container, never
 # copied in from a host's node_modules.
-FROM node:20-alpine AS deps
+FROM node:24-alpine AS deps
 WORKDIR /app
 RUN apk add --no-cache python3 make g++
 COPY package.json package-lock.json ./
@@ -22,7 +22,7 @@ RUN npm run build
 RUN npm prune --omit=dev
 
 # ---- runtime: slim image, prod deps + compiled output only ----
-FROM node:20-alpine AS runtime
+FROM node:24-alpine AS runtime
 ENV NODE_ENV=production
 WORKDIR /app
 
