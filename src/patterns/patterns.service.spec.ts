@@ -4,6 +4,7 @@ import sharp from 'sharp';
 import { ModerationStatus, Role } from '../generated/prisma/enums';
 import { STORAGE_PROVIDER } from '../storage/storage-provider.interface';
 import { PatternsRepository } from './patterns.repository';
+import { LooksRepository } from '../looks/looks.repository';
 import { PatternsService } from './patterns.service';
 import type { Pattern } from '../generated/prisma/client';
 import type { AccessTokenPayload } from '../auth/auth.types';
@@ -59,6 +60,7 @@ describe('PatternsService', () => {
       providers: [
         PatternsService,
         { provide: PatternsRepository, useValue: repoMock },
+        { provide: LooksRepository, useValue: { delistReferencing: jest.fn().mockResolvedValue(0) } },
         { provide: STORAGE_PROVIDER, useValue: storageMock },
       ],
     }).compile();

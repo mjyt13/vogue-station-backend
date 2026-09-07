@@ -8,6 +8,7 @@ import {
 import { ModerationStatus, Role } from '../generated/prisma/enums';
 import { colorPolicy } from './colors.policy';
 import { ColorsRepository } from './colors.repository';
+import { LooksRepository } from '../looks/looks.repository';
 import { ColorResponse, PaginatedColorsResponse } from './dto/color.response';
 import type { Color } from '../generated/prisma/client';
 import type { AccessTokenPayload } from '../auth/auth.types';
@@ -17,7 +18,10 @@ import type { ModerationAction } from '../common/moderation';
 
 @Injectable()
 export class ColorsService {
-  constructor(private readonly colorsRepository: ColorsRepository) {}
+  constructor(
+    private readonly colorsRepository: ColorsRepository,
+    private readonly looksRepository: LooksRepository,
+  ) {}
 
   async list(
     user: AccessTokenPayload | undefined,
@@ -107,7 +111,11 @@ export class ColorsService {
   async moderate(id: string, action: ModerationAction): Promise<ColorResponse> {
     const color = await this.colorsRepository.findById(id);
     if (!color) throw new NotFoundException('Color not found');
-    if (!color.publishRequested) {
+    if (action === 'delist') {
+      if (!color.isPublic) {
+        throw new BadRequestException('Only a public color can be delisted');
+      }
+    } else if (!color.publishRequested) {
       throw new BadRequestException(
         'The owner has not requested publication of this color',
       );
@@ -116,6 +124,9 @@ export class ColorsService {
       id,
       moderationUpdate(action),
     );
+    if (action === 'delist') {
+      await this.looksRepository.delistReferencing({ colorId: id });
+    }
     return ColorResponse.from(updated);
   }
 

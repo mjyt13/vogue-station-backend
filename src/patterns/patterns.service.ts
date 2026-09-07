@@ -18,6 +18,7 @@ import {
 } from './image-validation';
 import { patternPolicy } from './patterns.policy';
 import { PatternsRepository } from './patterns.repository';
+import { LooksRepository } from '../looks/looks.repository';
 import {
   CreatePatternResponse,
   PaginatedPatternsResponse,
@@ -41,6 +42,7 @@ const EXT_BY_MIME: Record<string, string> = {
 export class PatternsService {
   constructor(
     private readonly patternsRepository: PatternsRepository,
+    private readonly looksRepository: LooksRepository,
     @Inject(STORAGE_PROVIDER) private readonly storage: StorageProvider,
   ) {}
 
@@ -219,18 +221,27 @@ export class PatternsService {
   ): Promise<PatternResponse> {
     const pattern = await this.patternsRepository.findById(id);
     if (!pattern) throw new NotFoundException('Pattern not found');
-    if (!pattern.confirmed) {
-      throw new BadRequestException('Cannot moderate an unconfirmed upload');
-    }
-    if (!pattern.publishRequested) {
-      throw new BadRequestException(
-        'The owner has not requested publication of this pattern',
-      );
+    if (action === 'delist') {
+      if (!pattern.isPublic) {
+        throw new BadRequestException('Only a public pattern can be delisted');
+      }
+    } else {
+      if (!pattern.confirmed) {
+        throw new BadRequestException('Cannot moderate an unconfirmed upload');
+      }
+      if (!pattern.publishRequested) {
+        throw new BadRequestException(
+          'The owner has not requested publication of this pattern',
+        );
+      }
     }
     const updated = await this.patternsRepository.update(
       id,
       moderationUpdate(action),
     );
+    if (action === 'delist') {
+      await this.looksRepository.delistReferencing({ patternId: id });
+    }
     return this.withThumbnail(updated);
   }
 

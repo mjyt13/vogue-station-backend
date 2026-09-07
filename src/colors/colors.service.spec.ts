@@ -2,6 +2,7 @@ import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { Role } from '../generated/prisma/enums';
 import { ColorsRepository } from './colors.repository';
+import { LooksRepository } from '../looks/looks.repository';
 import { ColorsService } from './colors.service';
 import type { Color } from '../generated/prisma/client';
 import type { AccessTokenPayload } from '../auth/auth.types';
@@ -44,6 +45,7 @@ describe('ColorsService', () => {
       providers: [
         ColorsService,
         { provide: ColorsRepository, useValue: repoMock },
+        { provide: LooksRepository, useValue: { delistReferencing: jest.fn().mockResolvedValue(0) } },
       ],
     }).compile();
     service = moduleRef.get(ColorsService);

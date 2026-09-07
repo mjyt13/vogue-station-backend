@@ -249,7 +249,11 @@ export class LooksService {
   async moderate(id: string, action: ModerationAction): Promise<LookResponse> {
     const look = await this.looksRepository.findById(id);
     if (!look) throw new NotFoundException('Look not found');
-    if (!look.publishRequested) {
+    if (action === 'delist') {
+      if (!look.isPublic) {
+        throw new BadRequestException('Only a public look can be delisted');
+      }
+    } else if (!look.publishRequested) {
       throw new BadRequestException(
         'The owner has not requested publication of this look',
       );

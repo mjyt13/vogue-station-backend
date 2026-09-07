@@ -52,4 +52,19 @@ export class LooksRepository {
   async deleteById(id: string): Promise<void> {
     await this.prisma.look.delete({ where: { id } });
   }
+
+  /**
+   * Delisting a pattern/color/model cascades to every public look built on
+   * it — a discontinued part must not keep rendering in the gallery. Returns
+   * how many looks were taken down (for the moderation response/log).
+   */
+  async delistReferencing(
+    ref: Pick<Prisma.LookWhereInput, 'patternId' | 'colorId' | 'garmentModelId'>,
+  ): Promise<number> {
+    const { count } = await this.prisma.look.updateMany({
+      where: { ...ref, isPublic: true },
+      data: { status: 'DELISTED', isPublic: false },
+    });
+    return count;
+  }
 }

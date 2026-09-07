@@ -29,12 +29,14 @@ enum GarmentKind {
 //   isPublic          visibility to other users; set to true ONLY by an
 //                     admin approval, never accepted from a client
 // Order of events: owner creates (private) → owner publishes → admin
-// approves/rejects → admin may reject again later to revoke publicity.
+// approves/rejects → admin may later delist a public item (discontinue it)
+// without branding it REJECTED; the owner can re-publish for re-review.
 // Allowed transitions live in the service layer, not in the DB.
 enum ModerationStatus {
   PENDING
   APPROVED
   REJECTED
+  DELISTED
 }
 
 model User {

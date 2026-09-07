@@ -18,6 +18,7 @@ import {
 } from './model-validation';
 import { modelPolicy } from './models.policy';
 import { ModelsRepository } from './models.repository';
+import { LooksRepository } from '../looks/looks.repository';
 import {
   CreateModelResponse,
   ModelDetailResponse,
@@ -39,6 +40,7 @@ function rawThumbnailKey(ownerId: string, id: string): string {
 export class ModelsService {
   constructor(
     private readonly modelsRepository: ModelsRepository,
+    private readonly looksRepository: LooksRepository,
     @Inject(STORAGE_PROVIDER) private readonly storage: StorageProvider,
   ) {}
 
@@ -208,18 +210,27 @@ export class ModelsService {
   async moderate(id: string, action: ModerationAction): Promise<ModelResponse> {
     const model = await this.modelsRepository.findById(id);
     if (!model) throw new NotFoundException('Model not found');
-    if (!model.confirmed) {
-      throw new BadRequestException('Cannot moderate an unconfirmed upload');
-    }
-    if (!model.publishRequested) {
-      throw new BadRequestException(
-        'The owner has not requested publication of this model',
-      );
+    if (action === 'delist') {
+      if (!model.isPublic) {
+        throw new BadRequestException('Only a public model can be delisted');
+      }
+    } else {
+      if (!model.confirmed) {
+        throw new BadRequestException('Cannot moderate an unconfirmed upload');
+      }
+      if (!model.publishRequested) {
+        throw new BadRequestException(
+          'The owner has not requested publication of this model',
+        );
+      }
     }
     const updated = await this.modelsRepository.update(
       id,
       moderationUpdate(action),
     );
+    if (action === 'delist') {
+      await this.looksRepository.delistReferencing({ garmentModelId: id });
+    }
     return this.withThumbnail(updated);
   }
 

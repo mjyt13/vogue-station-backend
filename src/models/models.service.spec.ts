@@ -3,6 +3,7 @@ import { Test } from '@nestjs/testing';
 import { GarmentKind, ModerationStatus, Role } from '../generated/prisma/enums';
 import { STORAGE_PROVIDER } from '../storage/storage-provider.interface';
 import { ModelsRepository } from './models.repository';
+import { LooksRepository } from '../looks/looks.repository';
 import { ModelsService } from './models.service';
 import type { GarmentModel } from '../generated/prisma/client';
 import type { AccessTokenPayload } from '../auth/auth.types';
@@ -54,6 +55,7 @@ describe('ModelsService', () => {
       providers: [
         ModelsService,
         { provide: ModelsRepository, useValue: repoMock },
+        { provide: LooksRepository, useValue: { delistReferencing: jest.fn().mockResolvedValue(0) } },
         { provide: STORAGE_PROVIDER, useValue: storageMock },
       ],
     }).compile();
