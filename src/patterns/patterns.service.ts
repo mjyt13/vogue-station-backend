@@ -229,7 +229,9 @@ export class PatternsService {
       if (!pattern.confirmed) {
         throw new BadRequestException('Cannot moderate an unconfirmed upload');
       }
-      if (!pattern.publishRequested) {
+      // Official catalog patterns (ownerId null) have no owner to request
+      // publication — see the equivalent comment in models.service.ts.
+      if (pattern.ownerId !== null && !pattern.publishRequested) {
         throw new BadRequestException(
           'The owner has not requested publication of this pattern',
         );

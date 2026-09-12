@@ -218,7 +218,12 @@ export class ModelsService {
       if (!model.confirmed) {
         throw new BadRequestException('Cannot moderate an unconfirmed upload');
       }
-      if (!model.publishRequested) {
+      // Official catalog items (ownerId null) have no owner to request
+      // publication — admin has standing authority over them directly, so
+      // this gate only applies to user-submitted uploads. Without this,
+      // a delisted catalog item could never be re-approved (see ROADMAP
+      // item 12b's follow-up).
+      if (model.ownerId !== null && !model.publishRequested) {
         throw new BadRequestException(
           'The owner has not requested publication of this model',
         );

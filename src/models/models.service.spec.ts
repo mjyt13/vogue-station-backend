@@ -63,7 +63,7 @@ describe('ModelsService', () => {
   });
 
   it('returns a signed URL and hides the raw object key', async () => {
-    repoMock.findById.mockResolvedValue({ ...baseModel, ownerId: null });
+    repoMock.findById.mockResolvedValue({ ...baseModel, ownerId: null, isPublic: true });
 
     const result = await service.getWithUrl(stranger, 'm1');
 

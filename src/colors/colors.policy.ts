@@ -8,7 +8,7 @@ export const colorPolicy = {
   whereVisibleTo(user: AccessTokenPayload | undefined): Prisma.ColorWhereInput {
     return {
       OR: [
-        { ownerId: null },
+        { ownerId: null, isPublic: true },
         { isPublic: true },
         ...(user ? [{ ownerId: user.sub }] : []),
       ],
@@ -17,7 +17,7 @@ export const colorPolicy = {
 
   canSee(user: AccessTokenPayload | undefined, color: Color): boolean {
     return (
-      color.ownerId === null ||
+      (color.ownerId === null && color.isPublic) ||
       color.ownerId === user?.sub ||
       color.isPublic ||
       user?.role === Role.ADMIN

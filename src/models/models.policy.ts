@@ -14,7 +14,7 @@ export const modelPolicy = {
   ): Prisma.GarmentModelWhereInput {
     return {
       OR: [
-        { ownerId: null, confirmed: true },
+        { ownerId: null, isPublic: true, confirmed: true },
         { isPublic: true, status: 'APPROVED', confirmed: true },
         ...(user ? [{ ownerId: user.sub }] : []),
       ],
@@ -24,7 +24,7 @@ export const modelPolicy = {
   /** Same rule for one row; admins additionally see everything. */
   canSee(user: AccessTokenPayload | undefined, model: GarmentModel): boolean {
     return (
-      model.ownerId === null ||
+      (model.ownerId === null && model.isPublic) ||
       model.ownerId === user?.sub ||
       (model.isPublic && model.status === 'APPROVED') ||
       user?.role === Role.ADMIN

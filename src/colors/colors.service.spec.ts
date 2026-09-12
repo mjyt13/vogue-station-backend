@@ -84,7 +84,7 @@ describe('ColorsService', () => {
   });
 
   it('rejects deleting a visible preset as 403 for non-admins', async () => {
-    repoMock.findById.mockResolvedValue({ ...ownColor, ownerId: null });
+    repoMock.findById.mockResolvedValue({ ...ownColor, ownerId: null, isPublic: true });
     await expect(service.delete(other, 'c1')).rejects.toThrow(
       ForbiddenException,
     );

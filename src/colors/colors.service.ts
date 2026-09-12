@@ -115,7 +115,9 @@ export class ColorsService {
       if (!color.isPublic) {
         throw new BadRequestException('Only a public color can be delisted');
       }
-    } else if (!color.publishRequested) {
+    } else if (color.ownerId !== null && !color.publishRequested) {
+      // Official catalog colors (ownerId null) have no owner to request
+      // publication — see the equivalent comment in models.service.ts.
       throw new BadRequestException(
         'The owner has not requested publication of this color',
       );

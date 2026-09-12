@@ -10,7 +10,7 @@ export const patternPolicy = {
   ): Prisma.PatternWhereInput {
     return {
       OR: [
-        { ownerId: null, confirmed: true },
+        { ownerId: null, isPublic: true, confirmed: true },
         { isPublic: true, status: 'APPROVED', confirmed: true },
         ...(user ? [{ ownerId: user.sub }] : []),
       ],
@@ -19,7 +19,7 @@ export const patternPolicy = {
 
   canSee(user: AccessTokenPayload | undefined, pattern: Pattern): boolean {
     return (
-      pattern.ownerId === null ||
+      (pattern.ownerId === null && pattern.isPublic) ||
       pattern.ownerId === user?.sub ||
       (pattern.isPublic && pattern.status === 'APPROVED') ||
       user?.role === Role.ADMIN
